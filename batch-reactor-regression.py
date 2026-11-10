@@ -5,11 +5,11 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.17.3
+#       jupytext_version: 1.19.6
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: CHME5137
 #     language: python
-#     name: python3
+#     name: chme5137
 # ---
 
 # %% [markdown]
@@ -106,10 +106,27 @@ plt.show()
 # %%
 def cA_model(times, kf, kr):
     """C_A (mol/L) at each of `times` (s), for rate constants kf and kr (1/s)."""
-    
+    def rhs(t, y):
+        cA = y[0]
+        cB = cA0 - cA                     # FILL IN: C_B from C_A
+        return [kr * cB - kf * cA]                 # FILL IN: dC_A/dt
+    sol = scipy.integrate.solve_ivp(rhs, (0, times[-1]), [cA0], t_eval=times,
+                                    rtol=1e-8, atol=1e-10)
+    if not sol.success:
+        raise RuntimeError(sol.message)
+    return sol.y[0]
 
 
-# your test here
+def cA_exact(times, kf, kr):
+    """The exact solution, for testing cA_model."""
+    cA_eq = cA0 * kr / (kf + kr)                      # FILL IN
+    return cA_eq + (cA0 - cA_eq) * np.exp(-(kf + kr) * times)                       # FILL IN
+
+
+kf_test, kr_test = 0.02, 0.03
+assert np.allclose(cA_model(times, kf_test, kr_test),
+                   cA_exact(times, kf_test, kr_test), rtol=1e-6)
+print("cA_model agrees with the exact solution")
 
 
 # %% [markdown]
@@ -120,8 +137,39 @@ def cA_model(times, kf, kr):
 # from the data. Roughly how long does $C_A$ take to get halfway to where it ends up?
 
 # %%
+cA_298 = cA_data[298.15]
+
+try:
+    popt, pcov = scipy.optimize.curve_fit(cA_model, times, cA_298)
+    print("curve_fit returned kf, kr =", popt)
+    print("pcov =", pcov)
+except Exception as e:
+    print("curve_fit failed:", type(e).__name__, e)
 
 # %%
+tried = []
+
+def cA_model_logged(times, kf, kr):
+    tried.append((kf, kr))
+    return cA_model(times, kf, kr)
+
+try:
+    scipy.optimize.curve_fit(cA_model_logged, times, cA_298)
+except RuntimeError as e:
+    print("failed:", e)
+
+for kf, kr in tried:
+    print(f"kf = {kf:12.6g}   kr = {kr:12.6g}")
+
+# %%
+print(cA_model(times, 1.0, 1.0))
+
+plt.plot(times, cA_298, 'o', label='data at 298 K')
+plt.plot(times, cA_model(times, 1.0, 1.0), '-', label='model, kf = kr = 1 s⁻¹')
+plt.xlabel('time (s)')
+plt.ylabel('$C_A$ (mol/L)')
+plt.legend()
+plt.show()
 
 # %% [markdown]
 # **(c) Look at it.** Plot the data and the fitted curve, and below it the residuals
@@ -131,9 +179,28 @@ def cA_model(times, kf, kr):
 # choose it?
 
 # %%
+# Starting guess from the 298 K data:
+cA_plateau = cA_298[-4:].mean()          # last four points, about 5.55 mol/L
+cA_half = (cA0 + cA_plateau) / 2         # halfway from 10 to the plateau, about 7.8 mol/L
+t_half = 17.0                            # s, read off the plot: data crosses 7.8 between 10 s and 20 s
+
+k_sum = np.log(2) / t_half               # kf + kr, from the exact solution
+kr_guess = k_sum * cA_plateau / cA0      # from C_A,eq / C_A,0 = kr / (kf + kr)
+kf_guess = k_sum - kr_guess
+print(f"guess: kf = {kf_guess:.4f}, kr = {kr_guess:.4f} 1/s")
+
+popt, pcov = scipy.optimize.curve_fit(cA_model, times, cA_298, p0=[kf_guess, kr_guess])
+kf_fit, kr_fit = popt
+perr = np.sqrt(np.diag(pcov))
+print(f"kf = {kf_fit:.4f} ± {perr[0]:.4f} 1/s")
+print(f"kr = {kr_fit:.4f} ± {perr[1]:.4f} 1/s")
 
 # %% [markdown]
 # *Answer:*
+#
+# Without p0, curve_fit starts at kf = kr = 1 s⁻¹, so the model is already at equilibrium (flat at 5.0 mol/L) before the first data point, and changing kf or kr barely changes it. With no slope to follow, curve_fit jumped to kf ≈ kr ≈ −99 s⁻¹, where C_A grows exponentially, and solve_ivp failed.
+#
+# For the starting guess, I took the plateau (≈ 5.55 mol/L) to give kr/(kf + kr) and the half-time (≈ 17 s) to give kf + kr = ln 2/t½, which gave kf = 0.0177 and kr = 0.0230 s⁻¹. The fit gives kf = 0.0168 ± 0.0008 s⁻¹ and kr = 0.0201 ± 0.0015 s⁻¹ (± is one standard error). The residuals scatter randomly within about ±0.2 mol/L, so the model fits well.
 
 # %% [markdown]
 # ## 2. Three temperatures, in two steps
