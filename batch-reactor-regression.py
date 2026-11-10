@@ -212,6 +212,20 @@ print(f"kr = {kr_fit:.4f} ± {perr[1]:.4f} 1/s")
 # or exothermic? How can you tell?
 
 # %%
+kf_T, kr_T, kf_err, kr_err = [], [], [], []
+for T in temperatures:
+    popt, pcov = scipy.optimize.curve_fit(cA_model, times, cA_data[T], p0=[kf_fit, kr_fit])
+    perr = np.sqrt(np.diag(pcov))
+    kf_T.append(popt[0]); kr_T.append(popt[1])
+    kf_err.append(perr[0]); kr_err.append(perr[1])
+
+kf_T, kr_T = np.array(kf_T), np.array(kr_T)
+kf_err, kr_err = np.array(kf_err), np.array(kr_err)
+K_T = kf_T / kr_T
+
+print("  T (K)        kf (1/s)              kr (1/s)           K")
+for T, kf, dkf, kr, dkr, K in zip(temperatures, kf_T, kf_err, kr_T, kr_err, K_T):
+    print(f"{T:7.2f}   {kf:.4f} ± {dkf:.4f}   {kr:.4f} ± {dkr:.4f}   {K:.3f}")
 
 # %% [markdown]
 # **(b) Arrhenius.** As in Lecture 13: `scipy.stats.linregress` on $\ln k_f$ against
@@ -225,6 +239,31 @@ print(f"kr = {kr_fit:.4f} ± {perr[1]:.4f} 1/s")
 # $\Delta H$ agree with what you said in (a)?
 
 # %%
+inv_T = 1 / temperatures
+
+arr = scipy.stats.linregress(inv_T, np.log(kf_T))
+Ea = -arr.slope * R / 1000                    # kJ/mol
+Ea_err = arr.stderr * R / 1000
+log10A = arr.intercept / np.log(10)
+log10A_err = arr.intercept_stderr / np.log(10)
+print(f"Ea = {Ea:.1f} ± {Ea_err:.1f} kJ/mol,  log10 A = {log10A:.2f} ± {log10A_err:.2f}")
+
+vh = scipy.stats.linregress(inv_T, np.log(K_T))
+dH = -vh.slope * R / 1000                     # kJ/mol
+dH_err = vh.stderr * R / 1000
+dS = vh.intercept * R                         # J/mol/K
+dS_err = vh.intercept_stderr * R
+print(f"dH = {dH:.1f} ± {dH_err:.1f} kJ/mol,  dS = {dS:.1f} ± {dS_err:.1f} J/mol/K")
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3))
+ax1.plot(inv_T, np.log(kf_T), 'o')
+ax1.plot(inv_T, arr.intercept + arr.slope * inv_T, '-')
+ax1.set_xlabel('1/T (1/K)'); ax1.set_ylabel('ln $k_f$'); ax1.set_title('Arrhenius')
+ax2.plot(inv_T, np.log(K_T), 'o')
+ax2.plot(inv_T, vh.intercept + vh.slope * inv_T, '-')
+ax2.set_xlabel('1/T (1/K)'); ax2.set_ylabel('ln K'); ax2.set_title("van 't Hoff")
+plt.tight_layout()
+plt.show()
 
 # %% [markdown]
 # **(d)** `linregress` gave you a ± on each of these. What does that ± know about,
@@ -232,7 +271,12 @@ print(f"kr = {kr_fit:.4f} ± {perr[1]:.4f} 1/s")
 # the ± you got in (a).
 
 # %% [markdown]
-# *Answer:*
+# *Answer
+#
+# K rises with temperature (0.84 → 1.00 → 1.22), so heating pushes the equilibrium towards B, and by Le Chatelier the reaction is endothermic. The van ‘t Hoff fit agrees: ΔH = +12.0 ± 0.7 kJ/mol, with ΔS = +38.8 ± 2.4 J/mol/K. Arrhenius gives Ea = 62.6 ± 1.0 kJ/mol and log₁₀A = 9.20 ± 0.17. All ± are one standard error from linregress. All four differ from the pre-experiment estimates; even the sign of ΔH is the opposite.
+#
+# The linregress ± only knows how far three points scatter about a straight line. That leaves 3 − 2 = 1 degree of freedom, so the scatter estimate itself is very unreliable. It also leaves out the ± on each k_f and K from (a): linregress treats those three points as exact, so the uncertainty in the 30 original measurements never reaches Ea, ΔH or ΔS.
+#
 
 # %% [markdown]
 # ## 3. All the data at once
