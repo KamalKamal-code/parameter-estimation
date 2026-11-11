@@ -317,16 +317,33 @@ print(T_all[:12], t_all[:12], cA_all[:12], sep='\n')
 def cA_model_all(x, log10A, Ea, dH, dS):
     """C_A (mol/L) for every (T, t) pair in x. Ea and dH in kJ/mol, dS in J/mol/K."""
     T_col, t_col = x
-    
+    cA_out = np.zeros(len(t_col))
+    for T in np.unique(T_col):
+        rows = (T_col == T)
+        kf = 10**log10A * np.exp(-Ea * 1000 / (R * T))      # kJ → J
+        K = np.exp(-(dH * 1000 - T * dS) / (R * T))         # ΔG° = ΔH − TΔS = −RT ln K
+        kr = kf / K
+        cA_out[rows] = cA_model(t_col[rows], kf, kr)
+    return cA_out
 
 
 # %%
+p0_task2 = [log10A, Ea, dH, dS]
+popt_all, pcov_all = scipy.optimize.curve_fit(cA_model_all, x_all, cA_all, p0=p0_task2)
+perr_all = np.sqrt(np.diag(pcov_all))
+
+names = ['log10 A', 'Ea (kJ/mol)', 'dH (kJ/mol)', 'dS (J/mol/K)']
+for name, value, err in zip(names, popt_all, perr_all):
+    print(f"{name:14s} = {value:7.2f} ± {err:.2f}")
 
 # %% [markdown]
 # **(b)** Now start from your estimates from before the experiments instead (6, 45, −10, −50).
 # Does it find the same answer? How far did the data move you from what you expected?
 
 # %%
+popt_prior, pcov_prior = scipy.optimize.curve_fit(cA_model_all, x_all, cA_all, p0=[6, 45, -10, -50])
+for name, value, err in zip(names, popt_prior, np.sqrt(np.diag(pcov_prior))):
+    print(f"{name:14s} = {value:7.2f} ± {err:.2f}")
 
 # %% [markdown]
 # **(c)** Compare with task 2. Are the centres the same? Are the error bars? Which set of
@@ -339,9 +356,17 @@ def cA_model_all(x, log10A, Ea, dH, dS):
 # If someone quotes only your four ± values, what are they missing?
 
 # %%
+corr = pcov_all / np.outer(perr_all, perr_all)
+np.set_printoptions(precision=4, suppress=True)
+print(names)
+print(corr)
 
 # %% [markdown]
-# *Answer:*
+# (b) Starting from the pre-experiment estimates (6, 45, −10, −50), the fit finds the same answer. The data moved us a long way: log₁₀A from 6 to 9.5, Ea from 45 to 64 kJ/mol, and ΔH and ΔS both changed sign (ΔH from −10 to +11.5 kJ/mol, ΔS from −50 to +37 J/mol/K).
+#
+# (c) The centres are close to task 2, but the error bar on Ea doubles (±2.1 vs ±1.0 kJ/mol), and log₁₀A’s goes from ±0.17 to ±0.37. I’d believe the global fit’s: it uses all 30 measurements, with 30 − 4 = 26 degrees of freedom, so it estimates the noise properly and carries it through to the parameters. The task 2 error bars came from the scatter of three points about a line, with 1 degree of freedom, and ignored the uncertainty in each k.
+#
+# (d) log₁₀A and Ea are correlated at +0.9996, and so are ΔH and ΔS. All four were measured over only 298 to 323 K, a narrow range of 1/T, so each pair is the slope and intercept of a line fitted far from 1/T = 0. Steepening the slope while raising the intercept fits the data almost equally well, which is the ridge from Lecture 13. Someone quoting only the four ± values would miss this: the individual uncertainties are wide, but the combinations, such as k_f at 310 K, are known much more precisely.
 
 # %% [markdown]
 # ## 4. Look at the residuals
