@@ -420,6 +420,8 @@ print(f"s = {s:.3f} mol/L  (N = {N}, p = {p})")
 
 # %% [markdown]
 # *Answer:*
+#
+# In my project the only parameter that is fitted is the backing permeability P_b, which I find with brentq so that the predicted buccal fraction matches the 51% measured. Everything else comes from the literature: D_f from Adrover et al.’s release experiments, P from Wanasathop et al.’s correlation of porcine buccal data, and saliva volume and flow from Collins and Dawes. The 51% is a mean across subjects in a clinical study, so its error is mainly between-patient variability, not measurement noise. Because it is one number fitted with one parameter, there are no residuals, and the fit cannot estimate its own uncertainty the way curve_fit did here. The permeability correlation is fitted to log P, so its errors are roughly the same relative size, a factor rather than a fixed amount. P_b will be strongly correlated with the other parameters that control how much drug reaches saliva (D_f, L and Q_s): a faster-releasing film with a better backing could give the same 51%, much like the E_a–A ridge here. Similarly, at steady state only the combination K·D_e/h sets the epithelial flux, so K, D_e and h can’t be told apart from the split alone.
 
 # %% [markdown]
 # ## Stretch problems (optional)
