@@ -385,9 +385,29 @@ print(corr)
 #   What would that tell you about your model, or about the experiment?
 
 # %%
+residuals_all = cA_all - cA_model_all(x_all, *popt_all)
+
+for T in temperatures:
+    rows = (T_all == T)
+    plt.plot(t_all[rows], residuals_all[rows], 'o', label=f'{T:.0f} K')
+plt.axhline(0, color='gray', lw=1)
+plt.xlabel('time (s)')
+plt.ylabel('residual (mol/L)')
+plt.legend()
+plt.show()
+
+for T in temperatures:
+    rows = (T_all == T)
+    print(f"{T:.0f} K: rms residual = {np.sqrt(np.mean(residuals_all[rows]**2)):.3f} mol/L")
+
+N, p = len(cA_all), len(popt_all)
+s = np.sqrt(np.sum(residuals_all**2) / (N - p))
+print(f"s = {s:.3f} mol/L  (N = {N}, p = {p})")
 
 # %% [markdown]
-# *Answer:*
+# The residuals look mostly like noise, with no trend in time, though at 308 K most fall slightly below zero. The scatter is not quite the same at each temperature: the RMS residual is about 0.11 mol/L at 298 K, but only 0.056 and 0.068 mol/L at 308 and 323 K. Least squares assumed equal scatter, so the 298 K run probably counts for a bit more than it should. From the residuals, s = √(Σr²/(N − p)) = 0.089 mol/L with N = 30 and p = 4, so C_A was measured to about ±0.09 mol/L, roughly 1–2% of the values.
+#
+# If the instrument were really good to ±0.01 mol/L, the residuals would be about 9 times larger than the measurement noise. Then the misfit couldn’t be measurement error. Either the model is missing something (the reaction isn’t exactly first-order and reversible, or ΔH, ΔS aren’t really constant), or the experiment has other errors the instrument figure doesn’t cover, such as temperature drift, timing errors or sampling. Or the ±0.01 is optimistic.
 
 # %% [markdown]
 # ## 5. Your project
